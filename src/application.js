@@ -78,7 +78,6 @@ export default () => {
     } catch (err) {
       return;
     }
-
     const urlWithProxy = `https://api.allorigins.win/raw?url=${url}`;
     feedParser(urlWithProxy)
       .then((data) => {
