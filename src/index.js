@@ -1,4 +1,4 @@
 import 'bootstrap/dist/css/bootstrap.min.css';
+import app from './application';
 
-console.log('hello');
-console.log('Versel');
+app();
