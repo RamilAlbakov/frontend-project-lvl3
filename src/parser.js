@@ -1,13 +1,5 @@
 import axios from 'axios';
-
-const errorMessages = {
-  network: {
-    error: 'Network Problems. Try again.',
-  },
-  parser: {
-    error: "This source doesn't contain valid rss",
-  },
-};
+import i18next from 'i18next';
 
 const xmlParser = (httpResponse) => {
   const parser = new DOMParser();
@@ -18,7 +10,7 @@ const feedParser = (url) => axios.get(url)
   .then((response) => {
     const doc = xmlParser(response);
     if (doc.documentElement.nodeName === 'parsererror') {
-      return errorMessages.parser.error;
+      throw new Error(i18next.t('parserError'));
     }
 
     const titles = doc.getElementsByTagName('title');
@@ -33,9 +25,11 @@ const feedParser = (url) => axios.get(url)
         return { title, description, link };
       });
   })
-  .catch(() => {
-    console.log(errorMessages.network.error);
-    throw new Error(errorMessages.network.error);
+  .catch((err) => {
+    if (err.message === i18next.t('parserError')) {
+      throw new Error(i18next.t('parserError'));
+    }
+    throw new Error(i18next.t('networkError'));
   });
 
 export default feedParser;

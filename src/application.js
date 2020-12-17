@@ -1,62 +1,84 @@
+import i18next from 'i18next';
 import * as yup from 'yup';
 import onChange from 'on-change';
+import resources from './locales';
 import {
-  inputStateHandler, errorHandler, renderFeedsAndPosts,
+  validationErrorHandler, rssErrorHandler, renderFeedsAndPosts, formProcessStateHandler,
 } from './view';
 import feedParser from './parser';
+
+let idCounter = 0;
 
 const schema = yup.object().shape({
   url: yup.string().url().required(),
 });
 
-const updateValidationState = (state) => {
+const validate = (fields) => {
   try {
-    schema.validateSync(state.rssForm.data, { abortEarly: false });
-    state.error = null;
-    state.rssForm.state = 'valid';
+    schema.validateSync(fields, { abortEarly: false });
+    return '';
   } catch (err) {
-    state.error = err.inner ? err.inner[0].message : null;
-    throw new Error('Wrong url');
+    return err.inner[0].message;
   }
 };
 
-const generateId = (feedAndPosts, allId) => {
-  const id = allId.length + 1;
-  allId.push(id);
+const updateValidationState = (state) => {
+  const processedUrl = state.rssForm.addedUrls;
+  const { url } = state.rssForm.fields;
+  const error = processedUrl.includes(url) ? i18next.t('rssExistError') : validate(state.rssForm.fields);
+  state.rssForm.validationError = error;
+  return error;
+};
+
+const generateId = (feedAndPosts) => {
+  idCounter += 1;
   const [feed, ...postsArr] = feedAndPosts;
-  feed.id = id;
-  const posts = { feedId: id, posts: postsArr };
+  feed.id = idCounter;
+  const posts = { feedId: idCounter, posts: postsArr };
   return [feed, posts];
 };
 
 export default () => {
+  i18next.init({
+    lng: 'en',
+    debug: true,
+    resources,
+  }).then(() => {
+    console.log('initialized');
+  });
+
   const state = {
     rssForm: {
-      state: 'initial',
-      data: { url: '' },
+      processState: 'initial',
+      fields: { url: '' },
+      addedUrls: [],
+      validationError: '',
     },
     rssData: {
-      feeds: [],
-      posts: [],
+      data: {
+        feeds: [],
+        posts: [],
+      },
+      error: null,
     },
-    addedUrls: [],
-    idList: [],
-    error: null,
   };
 
   const watchedState = onChange(state, (path, value) => {
     switch (path) {
-      case 'rssForm.state':
-        inputStateHandler(value);
+      case 'rssForm.validationError':
+        validationErrorHandler(value);
         break;
-      case 'error':
-        errorHandler(value);
+      case 'rssData.error':
+        rssErrorHandler(value);
         break;
-      case 'rssData.feeds':
+      case 'rssData.data.feeds':
         renderFeedsAndPosts(value, 'feeds');
         break;
-      case 'rssData.posts':
+      case 'rssData.data.posts':
         renderFeedsAndPosts(value, 'posts');
+        break;
+      case 'rssForm.processState':
+        formProcessStateHandler(value);
         break;
       default:
         break;
@@ -68,31 +90,24 @@ export default () => {
     e.preventDefault();
     const formData = new FormData(e.target);
     const url = formData.get('url');
-    if (watchedState.addedUrls.includes(url)) {
-      watchedState.error = 'Rss already exists';
+    watchedState.rssForm.fields.url = url;
+    const validationError = updateValidationState(watchedState);
+    watchedState.rssForm.processState = 'sent';
+    if (validationError !== '') {
       return;
     }
-    watchedState.rssForm.data.url = url;
-    try {
-      updateValidationState(watchedState);
-    } catch (err) {
-      return;
-    }
+
     const urlWithProxy = `https://api.allorigins.win/raw?url=${url}`;
     feedParser(urlWithProxy)
       .then((data) => {
-        if (typeof data === 'string') {
-          watchedState.error = data;
-          return;
-        }
-        const [feed, posts] = generateId(data, watchedState.idList);
-        watchedState.rssData.feeds.push(feed);
-        watchedState.rssData.posts.push(posts);
-        watchedState.addedUrls.push(url);
-        watchedState.rssForm.state = 'initial';
+        const [feed, posts] = generateId(data);
+        watchedState.rssData.data.feeds.push(feed);
+        watchedState.rssData.data.posts.push(posts);
+        watchedState.rssForm.addedUrls.push(url);
+        watchedState.rssForm.processState = 'initial';
       })
-      .catch((error) => {
-        watchedState.error = error.message;
+      .catch((err) => {
+        watchedState.rssData.error = err.message;
       });
   });
 };
