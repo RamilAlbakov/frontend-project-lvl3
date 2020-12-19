@@ -1,13 +1,12 @@
 import i18next from 'i18next';
 import * as yup from 'yup';
 import onChange from 'on-change';
+// import _ from 'lodash';
 import resources from './locales';
 import {
   validationErrorHandler, rssErrorHandler, renderFeedsAndPosts, formProcessStateHandler,
 } from './view';
-import feedParser from './parser';
-
-let idCounter = 0;
+import { feedParser, updatePosts } from './parser';
 
 const schema = yup.object().shape({
   url: yup.string().url().required(),
@@ -23,19 +22,11 @@ const validate = (fields) => {
 };
 
 const updateValidationState = (state) => {
-  const processedUrl = state.rssForm.addedUrls;
+  const processedUrl = state.rssForm.addedUrls.map(({ url }) => url);
   const { url } = state.rssForm.fields;
   const error = processedUrl.includes(url) ? i18next.t('rssExistError') : validate(state.rssForm.fields);
   state.rssForm.validationError = error;
   return error;
-};
-
-const generateId = (feedAndPosts) => {
-  idCounter += 1;
-  const [feed, ...postsArr] = feedAndPosts;
-  feed.id = idCounter;
-  const posts = { feedId: idCounter, posts: postsArr };
-  return [feed, posts];
 };
 
 export default () => {
@@ -46,6 +37,8 @@ export default () => {
   }).then(() => {
     console.log('initialized');
   });
+
+  let idCounter = 0;
 
   const state = {
     rssForm: {
@@ -85,6 +78,13 @@ export default () => {
     }
   });
 
+  const periodicUpdate = () => {
+    setTimeout(() => {
+      updatePosts(watchedState);
+      periodicUpdate();
+    }, 5000);
+  };
+
   const form = document.querySelector('form');
   form.addEventListener('submit', (e) => {
     e.preventDefault();
@@ -97,15 +97,16 @@ export default () => {
       return;
     }
 
-    const urlWithProxy = `https://api.allorigins.win/raw?url=${url}`;
-    feedParser(urlWithProxy)
+    feedParser(url, idCounter)
       .then((data) => {
-        const [feed, posts] = generateId(data);
+        const [feed, posts] = data;
         watchedState.rssData.data.feeds.push(feed);
         watchedState.rssData.data.posts.push(posts);
-        watchedState.rssForm.addedUrls.push(url);
+        watchedState.rssForm.addedUrls.push({ id: idCounter, url });
         watchedState.rssForm.processState = 'initial';
+        idCounter += 1;
       })
+      .then(() => periodicUpdate())
       .catch((err) => {
         watchedState.rssData.error = err.message;
       });
