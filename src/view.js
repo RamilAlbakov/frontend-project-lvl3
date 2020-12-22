@@ -50,55 +50,59 @@ const createPostsUl = (posts) => {
   const postsUl = document.createElement('ul');
   postsUl.classList.add('list-group');
 
-  const allPosts = posts
-    .reverse()
-    .map((feedPosts) => feedPosts.posts)
-    .flat();
+  const allPosts = posts.sort((a, b) => b.feedId - a.feedId);
 
   const liClassList = ['list-group-item', 'd-flex', 'justify-content-between', 'align-items-start'];
   allPosts.forEach((post) => {
-    const { title, link } = post;
+    const {
+      title, link, feedId, id,
+    } = post;
     const li = document.createElement('li');
     liClassList.forEach((liClass) => {
       li.classList.add(liClass);
     });
     li.innerHTML = `
       <a href="${link}" class="font-weight-bold" target="_blank" rel="noopener noreferrer">${title}</a>
-      <button type="button" class="btn btn-primary btn-sm" data-id="2" data-toggle="modal" data-target="#modal">
-        ${i18next.t('previewBtnText')}
-      </button>`;
+      <button type="button" class="btn btn-primary btn-sm" data-feedid="${feedId}" data-id="${id}" data-toggle="modal" data-target="#modal">
+          ${i18next.t('previewBtnText')}
+      </button>`.trim();
     postsUl.append(li);
   });
   return postsUl;
 };
 
-const renderPreviewBlock = (e) => {
-  e.preventDefault();
-  console.log(e.target);
-};
-
 export const renderFeedsAndPosts = (data, dataType) => {
   const div = document.querySelector(`.${dataType}`);
-  if (div.innerHTML === '') {
-    const h2 = document.createElement('h2');
-    h2.textContent = dataType === 'feeds' ? i18next.t('feeds') : i18next.t('posts');
-    div.append(h2);
-    const ul = dataType === 'feeds' ? createFeedUl(data) : createPostsUl(data);
-    div.append(ul);
-
-    if (dataType === 'posts') {
-      div.addEventListener('click', renderPreviewBlock);
-    }
-
-    return;
-  }
-
-  const oldUl = document.querySelector(`.${dataType} .list-group`);
-  oldUl.parentNode.removeChild(oldUl);
+  div.innerHTML = '';
+  const h2 = document.createElement('h2');
+  h2.textContent = dataType === 'feeds' ? i18next.t('feeds') : i18next.t('posts');
+  div.append(h2);
   const ul = dataType === 'feeds' ? createFeedUl(data) : createPostsUl(data);
   div.append(ul);
+};
 
-  if (dataType === 'posts') {
-    div.addEventListener('click', renderPreviewBlock);
-  }
+export const renderModalDiv = (post) => {
+  const { title, description, link } = post;
+  const modalTitle = document.querySelector('.modal-title');
+  modalTitle.textContent = title;
+  const modalBody = document.querySelector('.modal-body');
+  modalBody.textContent = description;
+  const btnFullArticle = document.querySelector('.full-article');
+  btnFullArticle.setAttribute('href', link);
+  btnFullArticle.textContent = i18next.t('modalBtnFullArticle');
+};
+
+export const renderVisitedLinks = (visitedPosts) => {
+  const allPostPreviewBtns = document.querySelectorAll('.posts .btn');
+  allPostPreviewBtns.forEach((btn) => {
+    const feedId = btn.getAttribute('data-feedid');
+    const postId = btn.getAttribute('data-id');
+    const post = visitedPosts
+      .filter((p) => p.feedId === Number(feedId) && p.id === Number(postId));
+    if (post.length > 0) {
+      const link = btn.previousElementSibling;
+      link.classList.remove('font-weight-bold');
+      link.classList.add('font-weight-normal');
+    }
+  });
 };

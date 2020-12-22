@@ -7,5 +7,6 @@ export default {
     networkError: 'Network Problems. Try again.',
     parserError: "This source doesn't contain valid rss",
     feedSuccess: 'Rss has been loaded',
+    modalBtnFullArticle: 'Full Article',
   },
 };
