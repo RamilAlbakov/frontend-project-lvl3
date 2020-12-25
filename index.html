@@ -2,16 +2,9 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <link href="preload.css" rel="stylesheet">
   <title>RSS Reader</title>
 </head>
 <body class="d-flex flex-column min-vh-100">
-  <div class="preloader">
-    <div class="preloader__row">
-      <div class="preloader__item"></div>
-      <div class="preloader__item"></div>
-    </div>
-  </div>
   <!-- Modal -->
   <div class="modal fade" id="modal" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
     <div class="modal-dialog">
@@ -60,15 +53,5 @@
       </div>
     </section>
   </main>
-
-  <script>
-    window.onload = function () {
-      document.body.classList.add('loaded_hiding');
-      window.setTimeout(function () {
-        document.body.classList.add('loaded');
-        document.body.classList.remove('loaded_hiding');
-      }, 500);
-    }
-  </script>
 </body>
 </html>
