@@ -2,6 +2,7 @@ import i18next from 'i18next';
 import * as yup from 'yup';
 import onChange from 'on-change';
 import _ from 'lodash';
+import $ from 'jquery';
 import resources from './locales';
 import {
   validationErrorHandler,
@@ -32,17 +33,6 @@ const updateValidationState = (state) => {
   const error = processedUrl.includes(url) ? i18next.t('rssExistError') : validate(state.rssForm.fields);
   state.rssForm.validationError = error;
   return error;
-};
-
-const setId = (feedAndPosts, id) => {
-  const [feed, ...posts] = feedAndPosts;
-  feed.id = id;
-  const postsWithId = posts.map((post, i) => {
-    post.feedId = id;
-    post.id = i;
-    return post;
-  });
-  return { feed, posts: postsWithId };
 };
 
 export default () => {
@@ -100,6 +90,12 @@ export default () => {
 
   let idCounter = 0;
 
+  const setId = (feedAndPosts) => feedAndPosts.map((item) => {
+    item.id = idCounter + 1;
+    idCounter += 1;
+    return item;
+  });
+
   const updatePosts = (urls) => {
     const feedIds = [];
     const feedParserPromises = urls.map((addedUrl) => {
@@ -108,28 +104,33 @@ export default () => {
       return feedParser(url);
     });
 
-    Promise.all(feedParserPromises)
+    return Promise.all(feedParserPromises)
       .then((newFeeds) => {
         const allNewPosts = newFeeds
           .map((newFeed, i) => {
-            const { posts: newPosts } = setId(newFeed, feedIds[i]);
-            return newPosts;
-          })
-          .flat();
+            const newPosts = newFeed.slice(1);
+            return { feedId: feedIds[i], posts: newPosts };
+          });
 
         const allOldPosts = watchedState.rssData.data.posts;
         const updatedPosts = feedIds
           .map((feedId) => {
-            const olfPosts = allOldPosts.filter((post) => post.feedId === feedId);
-            const newPosts = allNewPosts.filter((post) => post.feedId === feedId);
-            const diff = _.differenceBy(newPosts, olfPosts, 'title');
-            return _.concat(diff, olfPosts);
-          })
-          .flat();
+            const [oldPosts] = allOldPosts.filter((item) => item.feedId === feedId);
+            const [newPosts] = allNewPosts.filter((item) => item.feedId === feedId);
+            const diff = _.differenceBy(newPosts.posts, oldPosts.posts, 'title');
+            const diffWithId = setId(diff);
+            const posts = _.concat(diffWithId, oldPosts.posts);
+            return { feedId, posts };
+          });
 
         watchedState.rssData.data.posts = updatedPosts;
       });
   };
+
+  const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+  const periodicUpdate = () => delay(5000)
+    .then(() => updatePosts(watchedState.rssForm.addedUrls).then(() => periodicUpdate()));
 
   const form = document.querySelector('form');
   form.addEventListener('submit', (e) => {
@@ -145,33 +146,24 @@ export default () => {
 
     feedParser(url)
       .then((data) => {
-        const { feed, posts } = setId(data, idCounter);
+        const [feed, ...posts] = setId(data);
         watchedState.rssData.data.feeds.push(feed);
-        const addedPosts = watchedState.rssData.data.posts;
-        watchedState.rssData.data.posts = [...addedPosts, ...posts];
-        watchedState.rssForm.addedUrls.push({ id: idCounter, url });
+        watchedState.rssData.data.posts.push({ feedId: feed.id, posts });
+        watchedState.rssForm.addedUrls.push({ id: feed.id, url });
         watchedState.rssForm.processState = 'initial';
         idCounter += 1;
-
-        const postsUl = document.querySelector('.posts .list-group');
-        postsUl.addEventListener('click', (event) => {
-          if ('id' in event.target.dataset) {
-            const feedId = event.target.dataset.feedid;
-            const postId = event.target.dataset.id;
-            const [post] = watchedState.rssData.data.posts
-              .filter((p) => p.feedId === Number(feedId) && p.id === Number(postId));
-            watchedState.rssData.data.visitedPosts.push(post);
-          }
-        });
-
-        return { feed, posts };
       })
-      .then(() => {
-        setTimeout(function update() {
-          updatePosts(watchedState.rssForm.addedUrls);
-          setTimeout(update, 5000);
-        }, 5000);
-      })
+      .then(() => $('#modal').on('show.bs.modal', (ev) => {
+        const btn = ev.relatedTarget;
+        const postId = btn.getAttribute('data-id');
+        const [post] = watchedState.rssData.data.posts
+          .map((item) => item.posts)
+          .flat()
+          .filter((p) => p.id === Number(postId));
+
+        watchedState.rssData.data.visitedPosts.push(post);
+      }))
+      .then(periodicUpdate)
       .catch((err) => {
         watchedState.rssData.error = err.message;
       });

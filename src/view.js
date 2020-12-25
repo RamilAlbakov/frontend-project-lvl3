@@ -3,6 +3,14 @@ import i18next from 'i18next';
 const input = document.querySelector('[name=url]');
 const feedbackDiv = document.querySelector('.feedback');
 
+const reverse = (arr) => {
+  const newArr = [];
+  for (let i = arr.length - 1; i >= 0; i -= 1) {
+    newArr.push(arr[i]);
+  }
+  return newArr;
+};
+
 export const validationErrorHandler = (error) => {
   if (error) {
     input.classList.add('is-invalid');
@@ -31,54 +39,50 @@ export const rssErrorHandler = (error) => {
 };
 
 const createFeedUl = (feeds) => {
-  const feedsUl = document.createElement('ul');
-  feedsUl.classList.add('list-group');
-  feedsUl.classList.add('mb-5');
-  feeds
-    .reverse()
+  let ulHtml = '<ul class="list-group mb-5">';
+
+  const reversedFeeds = reverse(feeds);
+  reversedFeeds
     .forEach((feed) => {
       const { title, description } = feed;
-      const li = document.createElement('li');
-      li.classList.add('list-group-item');
-      li.innerHTML = `<h3>${title}</h3><p>${description}</p>`;
-      feedsUl.append(li);
+      const li = `
+        <li class="list-group-item">
+          <h3>${title}</h3>
+          <p>${description}</p>
+        </li>`.replace(/\s+/g, ' ').trim();
+      ulHtml = `${ulHtml}${li}`;
     });
-  return feedsUl;
+
+  return `${ulHtml}</ul>`;
 };
 
-const createPostsUl = (posts) => {
-  const postsUl = document.createElement('ul');
-  postsUl.classList.add('list-group');
+const createPostsUl = (data) => {
+  const allPosts = reverse(data)
+    .map((item) => item.posts)
+    .flat();
 
-  const allPosts = posts.sort((a, b) => b.feedId - a.feedId);
-
-  const liClassList = ['list-group-item', 'd-flex', 'justify-content-between', 'align-items-start'];
+  let ulHtml = '<ul class="list-group">';
   allPosts.forEach((post) => {
-    const {
-      title, link, feedId, id,
-    } = post;
-    const li = document.createElement('li');
-    liClassList.forEach((liClass) => {
-      li.classList.add(liClass);
-    });
-    li.innerHTML = `
-      <a href="${link}" class="font-weight-bold" target="_blank" rel="noopener noreferrer">${title}</a>
-      <button type="button" class="btn btn-primary btn-sm" data-feedid="${feedId}" data-id="${id}" data-toggle="modal" data-target="#modal">
+    const { title, link, id } = post;
+
+    const li = `
+      <li class="list-group-item d-flex justify-content-between align-items-start">
+        <a href="${link}" class="font-weight-bold" target="_blank" rel="noopener noreferrer">${title}</a>
+        <button type="button" class="btn btn-primary btn-sm" data-id="${id}" data-toggle="modal" data-target="#modal">
           ${i18next.t('previewBtnText')}
-      </button>`.trim();
-    postsUl.append(li);
+        </button>\
+      </li>`.replace(/\s+/g, ' ').trim();
+
+    ulHtml = `${ulHtml}${li}`;
   });
-  return postsUl;
+  return `${ulHtml}</ul>`;
 };
 
 export const renderFeedsAndPosts = (data, dataType) => {
   const div = document.querySelector(`.${dataType}`);
-  div.innerHTML = '';
-  const h2 = document.createElement('h2');
-  h2.textContent = dataType === 'feeds' ? i18next.t('feeds') : i18next.t('posts');
-  div.append(h2);
+  const h2TextContent = dataType === 'feeds' ? i18next.t('feeds') : i18next.t('posts');
   const ul = dataType === 'feeds' ? createFeedUl(data) : createPostsUl(data);
-  div.append(ul);
+  div.innerHTML = `<h2>${h2TextContent}</h2>${ul}`;
 };
 
 export const renderModalDiv = (post) => {
@@ -95,10 +99,9 @@ export const renderModalDiv = (post) => {
 export const renderVisitedLinks = (visitedPosts) => {
   const allPostPreviewBtns = document.querySelectorAll('.posts .btn');
   allPostPreviewBtns.forEach((btn) => {
-    const feedId = btn.getAttribute('data-feedid');
     const postId = btn.getAttribute('data-id');
     const post = visitedPosts
-      .filter((p) => p.feedId === Number(feedId) && p.id === Number(postId));
+      .filter((p) => p.id === Number(postId));
     if (post.length > 0) {
       const link = btn.previousElementSibling;
       link.classList.remove('font-weight-bold');

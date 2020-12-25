@@ -1,7 +1,7 @@
 import axios from 'axios';
 import i18next from 'i18next';
 
-const getUrlWithProxy = (url) => `https://api.allorigins.win/raw?url=${url}`;
+const getUrlWithProxy = (url) => `https://cors-anywhere.herokuapp.com/${url}`;
 
 const xmlParser = (httpResponse) => {
   const parser = new DOMParser();
@@ -11,6 +11,7 @@ const xmlParser = (httpResponse) => {
 const feedParser = (url) => axios.get(getUrlWithProxy(url))
   .then((response) => {
     const doc = xmlParser(response);
+    console.log(doc);
     if (doc.documentElement.nodeName === 'parsererror') {
       throw new Error(i18next.t('parserError'));
     }
