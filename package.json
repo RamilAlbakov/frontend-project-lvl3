@@ -1,5 +1,5 @@
 {
-  "name": "rss-reader",
+  "name": "@hexlet/code",
   "version": "1.0.0",
   "description": "[![Actions Status](https://github.com/RamilAlbakov/frontend-project-lvl3/workflows/hexlet-check/badge.svg)](https://github.com/RamilAlbakov/frontend-project-lvl3/actions)",
   "main": "index.js",
