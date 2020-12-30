@@ -1,18 +1,12 @@
 import i18next from 'i18next';
 import * as yup from 'yup';
-import onChange from 'on-change';
 import _ from 'lodash';
 import $ from 'jquery';
 import resources from './locales';
-import {
-  validationErrorHandler,
-  rssErrorHandler,
-  renderFeedsAndPosts,
-  formProcessStateHandler,
-  renderModalDiv,
-  renderVisitedLinks,
-} from './view';
-import feedParser from './parser';
+import onchange from './view';
+import parse from './parser';
+import makeRequest from './httpRequest';
+import { setId, delay } from './utils';
 
 const schema = yup.object().shape({
   url: yup.string().url().required(),
@@ -28,9 +22,9 @@ const validate = (fields) => {
 };
 
 const updateValidationState = (state) => {
-  const processedUrl = state.rssForm.addedUrls.map(({ url }) => url);
+  const processedUrls = state.rssForm.addedUrls.map(({ url }) => url);
   const { url } = state.rssForm.fields;
-  const error = processedUrl.includes(url) ? i18next.t('rssExistError') : validate(state.rssForm.fields);
+  const error = processedUrls.includes(url) ? i18next.t('rssExistError') : validate(state.rssForm.fields);
   state.rssForm.validationError = error;
   return error;
 };
@@ -55,79 +49,39 @@ export default () => {
       data: {
         feeds: [],
         posts: [],
-        visitedPosts: [],
+        visitedPostsId: [],
       },
       error: null,
     },
   };
 
-  const watchedState = onChange(state, (path, value) => {
-    switch (path) {
-      case 'rssForm.validationError':
-        validationErrorHandler(value);
-        break;
-      case 'rssData.error':
-        rssErrorHandler(value);
-        break;
-      case 'rssData.data.feeds':
-        renderFeedsAndPosts(value, 'feeds');
-        break;
-      case 'rssData.data.posts':
-        renderFeedsAndPosts(value, 'posts');
-        renderVisitedLinks(watchedState.rssData.data.visitedPosts);
-        break;
-      case 'rssForm.processState':
-        formProcessStateHandler(value);
-        break;
-      case 'rssData.data.visitedPosts':
-        renderModalDiv(value[value.length - 1]);
-        renderVisitedLinks(value);
-        break;
-      default:
-        break;
-    }
-  });
-
-  let idCounter = 0;
-
-  const setId = (feedAndPosts) => feedAndPosts.map((item) => {
-    item.id = idCounter + 1;
-    idCounter += 1;
-    return item;
-  });
+  const watchedState = onchange(state);
 
   const updatePosts = (urls) => {
-    const feedIds = [];
     const feedParserPromises = urls.map((addedUrl) => {
       const { id, url } = addedUrl;
-      feedIds.push(id);
-      return feedParser(url);
+      return makeRequest(url)
+        .then((document) => parse(document))
+        .then((feedAndPosts) => {
+          const posts = feedAndPosts.slice(1);
+          return { feedId: id, posts };
+        });
     });
 
     return Promise.all(feedParserPromises)
-      .then((newFeeds) => {
-        const allNewPosts = newFeeds
-          .map((newFeed, i) => {
-            const newPosts = newFeed.slice(1);
-            return { feedId: feedIds[i], posts: newPosts };
-          });
-
+      .then((allNewPosts) => {
         const allOldPosts = watchedState.rssData.data.posts;
-        const updatedPosts = feedIds
-          .map((feedId) => {
+        watchedState.rssData.data.posts = allNewPosts
+          .map((newPosts) => {
+            const { feedId } = newPosts;
             const [oldPosts] = allOldPosts.filter((item) => item.feedId === feedId);
-            const [newPosts] = allNewPosts.filter((item) => item.feedId === feedId);
             const diff = _.differenceBy(newPosts.posts, oldPosts.posts, 'title');
             const diffWithId = setId(diff);
             const posts = _.concat(diffWithId, oldPosts.posts);
             return { feedId, posts };
           });
-
-        watchedState.rssData.data.posts = updatedPosts;
       });
   };
-
-  const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
   const periodicUpdate = () => delay(5000)
     .then(() => updatePosts(watchedState.rssForm.addedUrls).then(() => periodicUpdate()));
@@ -138,34 +92,32 @@ export default () => {
     const formData = new FormData(e.target);
     const url = formData.get('url');
     watchedState.rssForm.fields.url = url;
-    const validationError = updateValidationState(watchedState);
     watchedState.rssForm.processState = 'sent';
+    const validationError = updateValidationState(watchedState);
     if (validationError !== '') {
       return;
     }
 
-    feedParser(url)
+    makeRequest(url)
+      .then((document) => parse(document))
       .then((data) => {
         const [feed, ...posts] = setId(data);
         watchedState.rssData.data.feeds.push(feed);
         watchedState.rssData.data.posts.push({ feedId: feed.id, posts });
         watchedState.rssForm.addedUrls.push({ id: feed.id, url });
         watchedState.rssForm.processState = 'initial';
-        idCounter += 1;
       })
-      .then(() => $('#modal').on('show.bs.modal', (ev) => {
-        const btn = ev.relatedTarget;
-        const postId = btn.getAttribute('data-id');
-        const [post] = watchedState.rssData.data.posts
-          .map((item) => item.posts)
-          .flat()
-          .filter((p) => p.id === Number(postId));
-
-        watchedState.rssData.data.visitedPosts.push(post);
-      }))
       .then(periodicUpdate)
       .catch((err) => {
-        watchedState.rssData.error = err.message;
+        console.log(err);
+        watchedState.rssData.error = err.message === i18next.t('parserError')
+          ? i18next.t('parserError') : i18next.t('networkError');
       });
+  });
+
+  $('#modal').on('show.bs.modal', (ev) => {
+    const btn = ev.relatedTarget;
+    const postId = btn.getAttribute('data-id');
+    watchedState.rssData.data.visitedPostsId.push(postId);
   });
 };
