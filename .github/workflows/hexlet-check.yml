@@ -9,37 +9,40 @@
 name: hexlet-check
 
 on:
+  pull_request:
   push:
     branches:
-      - '**'
-    tags:
-      - '**'
+      - master
+      # - 'releases/*'
 
 jobs:
-  build:
+  tests:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        node-version: [ 14.x ]
     steps:
       - uses: actions/checkout@v2
+      - run: make install
+      - run: make test
+      - run: make lint
 
-      - name: Hexlet project check
-        uses: hexlet/project-action@release
-        with:
-          hexlet-id: ${{ secrets.HEXLET_ID }}
-
-      - name: Use Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v1
-        with:
-          node-version: ${{ matrix.node-version }}
-
-      - name: npm install, build
-        run: |
-          make install
-          make build
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - run: make install
+      - run: node server.js &
+      - uses: ./
         env:
-          CI: true
+          NODE_DEBUG: http
+          ACTION_API_HOST: http://localhost:3000
+          ACTION_PROJECT_PATH: __fixtures__/project_source
+        with:
+          hexlet-id: 1
+          verbose: true
 
-      - name: Run linter
-        run: make lint
+  artifacts:
+    needs: e2e
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v2
+        with:
+          name: test-results
