@@ -12,6 +12,8 @@ on:
   push:
     branches:
       - '**'
+    tags:
+      - '**'
 
 jobs:
   build:
@@ -25,7 +27,7 @@ jobs:
       - name: Hexlet project check
         uses: hexlet/project-action@release
         with:
-          hexlet-id: ${{ secrets.HEXLET_ID }}
+          hexlet-id: ${{ secrets.12293 }}
 
       - name: Use Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v1
