@@ -1,8 +1,8 @@
 import axios from 'axios';
 import i18next from 'i18next';
 
-// const getUrlWithProxy = (url) => `https://api.allorigins.win/raw?url=${url}`;
-const getUrlWithProxy = (url) => `https://cors-anywhere.herokuapp.com/${url}`;
+const getUrlWithProxy = (url) => `https://api.allorigins.win/raw?url=${url}`;
+// const getUrlWithProxy = (url) => `https://cors-anywhere.herokuapp.com/${url}`;
 
 const parseXml = (httpResponse) => {
   const parser = new DOMParser();
