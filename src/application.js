@@ -58,9 +58,8 @@ export default () => {
     postsDiv: document.querySelector('.posts'),
   };
 
-  // const getUrlWithProxy = (url) => `https://api.allorigins.win/raw?url=${url}`;
-  // const getUrlWithProxy = (url) => `https://cors-anywhere.herokuapp.com/${url}`;
-  const getUrlWithProxy = (url) => `https://thingproxy.freeboard.io/fetch/${url}`;
+  const getUrlWithProxy = (url) => `https://api.allorigins.win/raw?url=${url}`;
+  // const getUrlWithProxy = (url) => `https://thingproxy.freeboard.io/fetch/${url}`;
 
   const watchedState = onchange(state, elements);
 
