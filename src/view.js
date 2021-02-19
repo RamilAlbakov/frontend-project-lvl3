@@ -1,50 +1,48 @@
 import i18next from 'i18next';
 import onChange from 'on-change';
-import { reverse } from './utils';
 
-const validationErrorHandler = (error) => {
-  const input = document.querySelector('[name=url]');
-  const feedbackDiv = document.querySelector('.feedback');
-  const addBtn = document.querySelector('[type="submit"]');
+export const processStates = {
+  initial: 'initial',
+  submitting: 'submitting',
+};
+
+const validationErrorHandler = (error, elements) => {
   if (error) {
-    input.classList.add('is-invalid');
-    feedbackDiv.classList.remove('text-success');
-    feedbackDiv.classList.add('text-danger');
+    elements.input.classList.add('is-invalid');
+    elements.feedbackDiv.classList.remove('text-success');
+    elements.feedbackDiv.classList.add('text-danger');
   } else {
-    input.classList.remove('is-invalid');
+    elements.input.classList.remove('is-invalid');
   }
-  feedbackDiv.textContent = error;
-  addBtn.disabled = false;
+  elements.feedbackDiv.textContent = error;
+  elements.addBtn.disabled = false;
 };
 
-const formProcessStateHandler = (state) => {
-  const input = document.querySelector('[name=url]');
-  const feedbackDiv = document.querySelector('.feedback');
-  const addBtn = document.querySelector('[type="submit"]');
-  if (state === 'initial') {
-    input.value = null;
-    feedbackDiv.classList.remove('text-danger');
-    feedbackDiv.classList.add('text-success');
-    feedbackDiv.textContent = i18next.t('feedSuccess');
-    input.focus();
-    addBtn.disabled = false;
+const formProcessStateHandler = (state, elements) => {
+  if (state === processStates.initial) {
+    elements.input.value = null;
+    elements.feedbackDiv.classList.remove('text-danger');
+    elements.feedbackDiv.classList.add('text-success');
+    elements.feedbackDiv.textContent = i18next.t('feedSuccess');
+    elements.input.focus();
+    elements.addBtn.disabled = false;
   }
-  if (state === 'sent') {
-    addBtn.disabled = true;
+  if (state === processStates.submitting) {
+    elements.addBtn.disabled = true;
   }
 };
 
-const rssErrorHandler = (error) => {
-  const feedbackDiv = document.querySelector('.feedback');
-  const addBtn = document.querySelector('[type="submit"]');
-  feedbackDiv.classList.remove('text-success');
-  feedbackDiv.classList.add('text-danger');
-  feedbackDiv.textContent = error;
-  addBtn.disabled = false;
+const rssErrorHandler = (error, elements) => {
+  if (error) {
+    elements.feedbackDiv.classList.remove('text-success');
+    elements.feedbackDiv.classList.add('text-danger');
+  }
+  elements.feedbackDiv.textContent = error;
+  elements.addBtn.disabled = false;
 };
 
 const createFeedUl = (feeds) => {
-  const reversedFeeds = reverse(feeds);
+  const reversedFeeds = [...feeds].reverse();
 
   const liHtml = reversedFeeds
     .map((feed) => {
@@ -61,7 +59,9 @@ const createFeedUl = (feeds) => {
 };
 
 const createPostsUl = (data) => {
-  const allPosts = reverse(data).flatMap((item) => item.posts);
+  const allPosts = [...data]
+    .reverse()
+    .flatMap((item) => item.posts);
 
   const liHtml = allPosts
     .map((post) => {
@@ -79,32 +79,40 @@ const createPostsUl = (data) => {
   return `<ul class="list-group">${liHtml}</ul>`;
 };
 
-const renderFeedsAndPosts = (data, dataType) => {
-  const div = document.querySelector(`.${dataType}`);
-  const h2TextContent = dataType === 'feeds' ? i18next.t('feeds') : i18next.t('posts');
-  const ul = dataType === 'feeds' ? createFeedUl(data) : createPostsUl(data);
+const renderFeedsAndPosts = (data, dataType, elements) => {
+  let div;
+  let h2TextContent;
+  let ul;
+
+  if (dataType === 'feeds') {
+    div = elements.feedsDiv;
+    h2TextContent = i18next.t('feeds');
+    ul = createFeedUl(data);
+  } else if (dataType === 'posts') {
+    div = elements.postsDiv;
+    h2TextContent = i18next.t('posts');
+    ul = createPostsUl(data);
+  }
+
   div.innerHTML = `<h2>${h2TextContent}</h2>${ul}`;
 };
 
-const renderModalDiv = (postId, posts) => {
+const renderModalDiv = (postId, posts, elements) => {
   const [post] = posts
     .flatMap((item) => item.posts)
     .filter((p) => p.id === postId);
   const { title, description, link } = post;
-  const modalTitle = document.querySelector('.modal-title');
-  modalTitle.textContent = title;
-  const modalBody = document.querySelector('.modal-body');
-  modalBody.textContent = description;
-  const btnFullArticle = document.querySelector('.full-article');
-  btnFullArticle.setAttribute('href', link);
-  btnFullArticle.textContent = i18next.t('modalBtnFullArticle');
+  elements.modalTitle.textContent = title;
+  elements.modalBody.textContent = description;
+  elements.btnFullArticle.setAttribute('href', link);
+  elements.btnFullArticle.textContent = i18next.t('modalBtnFullArticle');
 };
 
-const renderVisitedLinks = (visitedPostsId) => {
+const renderVisitedLinks = (visitedPostsIds) => {
   const allPostPreviewBtns = document.querySelectorAll('.posts .btn');
   allPostPreviewBtns.forEach((btn) => {
     const postId = btn.getAttribute('data-id');
-    const ids = visitedPostsId
+    const ids = visitedPostsIds
       .filter((id) => id === postId);
     if (ids.length > 0) {
       const link = btn.previousElementSibling;
@@ -114,28 +122,30 @@ const renderVisitedLinks = (visitedPostsId) => {
   });
 };
 
-export default (state) => onChange(state, (path, value) => {
+export const onchange = (state, elements) => onChange(state, (path, value) => {
   switch (path) {
     case 'rssForm.validationError':
-      validationErrorHandler(value);
+      validationErrorHandler(value, elements);
       break;
     case 'rssData.error':
-      rssErrorHandler(value);
+      rssErrorHandler(value, elements);
       break;
-    case 'rssData.data.feeds':
-      renderFeedsAndPosts(value, 'feeds');
+    case 'rssData.feeds':
+      renderFeedsAndPosts(value, 'feeds', elements);
       break;
-    case 'rssData.data.posts':
-      renderFeedsAndPosts(value, 'posts');
-      renderVisitedLinks(state.rssData.data.visitedPostsId);
+    case 'rssData.posts':
+      renderFeedsAndPosts(value, 'posts', elements);
+      renderVisitedLinks(state.rssData.visitedPostsIds);
       break;
     case 'rssForm.processState':
-      formProcessStateHandler(value);
+      formProcessStateHandler(value, elements);
       break;
-    case 'rssData.data.visitedPostsId':
-      renderModalDiv(value[value.length - 1], state.rssData.data.posts);
+    case 'rssData.visitedPostsIds': {
+      const lastVisitedPostId = value[value.length - 1];
+      renderModalDiv(lastVisitedPostId, state.rssData.posts, elements);
       renderVisitedLinks(value);
       break;
+    }
     default:
       break;
   }

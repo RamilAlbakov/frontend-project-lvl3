@@ -1,32 +1,25 @@
 import i18next from 'i18next';
 import * as yup from 'yup';
+import axios from 'axios';
 import _ from 'lodash';
 import $ from 'jquery';
 import resources from './locales';
-import onchange from './view';
+import { onchange, processStates } from './view';
 import parse from './parser';
-import makeRequest from './httpRequest';
-import { setId, delay } from './utils';
 
 const schema = yup.object().shape({
   url: yup.string().url().required(),
 });
 
-const validate = (fields) => {
+const validate = (state) => {
+  const { url } = state.rssForm;
+  const processedUrls = state.rssForm.addedUrls.map((addedUrl) => addedUrl.url);
   try {
-    schema.validateSync(fields, { abortEarly: false });
-    return '';
+    schema.validateSync({ url }, { abortEarly: false });
+    return processedUrls.includes(url) ? i18next.t('rssExistError') : '';
   } catch (err) {
     return err.inner[0].message;
   }
-};
-
-const updateValidationState = (state) => {
-  const processedUrls = state.rssForm.addedUrls.map(({ url }) => url);
-  const { url } = state.rssForm.fields;
-  const error = processedUrls.includes(url) ? i18next.t('rssExistError') : validate(state.rssForm.fields);
-  state.rssForm.validationError = error;
-  return error;
 };
 
 export default () => {
@@ -40,38 +33,57 @@ export default () => {
 
   const state = {
     rssForm: {
-      processState: 'initial',
-      fields: { url: '' },
+      url: '',
       addedUrls: [],
+      valid: true,
+      processState: processStates.initial,
       validationError: '',
     },
     rssData: {
-      data: {
-        feeds: [],
-        posts: [],
-        visitedPostsId: [],
-      },
+      feeds: [],
+      posts: [],
+      visitedPostsIds: [],
       error: null,
     },
   };
 
-  const watchedState = onchange(state);
+  const elements = {
+    input: document.querySelector('[name=url]'),
+    feedbackDiv: document.querySelector('.feedback'),
+    addBtn: document.querySelector('[type="submit"]'),
+    modalTitle: document.querySelector('.modal-title'),
+    modalBody: document.querySelector('.modal-body'),
+    btnFullArticle: document.querySelector('.full-article'),
+    feedsDiv: document.querySelector('.feeds'),
+    postsDiv: document.querySelector('.posts'),
+  };
+
+  // const getUrlWithProxy = (url) => `https://api.allorigins.win/raw?url=${url}`;
+  // const getUrlWithProxy = (url) => `https://cors-anywhere.herokuapp.com/${url}`;
+  const getUrlWithProxy = (url) => `https://thingproxy.freeboard.io/fetch/${url}`;
+
+  const watchedState = onchange(state, elements);
+
+  const setId = (data) => data.map((item) => {
+    item.id = _.uniqueId();
+    return item;
+  });
 
   const updatePosts = (urls) => {
-    const feedParserPromises = urls.map((addedUrl) => {
+    const newPostsPromises = urls.map((addedUrl) => {
       const { id, url } = addedUrl;
-      return makeRequest(url)
-        .then((document) => parse(document))
-        .then((feedAndPosts) => {
-          const posts = feedAndPosts.slice(1);
+      return axios.get(getUrlWithProxy(url))
+        .then((response) => parse(response))
+        .then((rssData) => {
+          const { posts } = rssData;
           return { feedId: id, posts };
         });
     });
 
-    return Promise.all(feedParserPromises)
+    return Promise.all(newPostsPromises)
       .then((allNewPosts) => {
-        const allOldPosts = watchedState.rssData.data.posts;
-        watchedState.rssData.data.posts = allNewPosts
+        const allOldPosts = watchedState.rssData.posts;
+        watchedState.rssData.posts = allNewPosts
           .map((newPosts) => {
             const { feedId } = newPosts;
             const [oldPosts] = allOldPosts.filter((item) => item.feedId === feedId);
@@ -83,33 +95,36 @@ export default () => {
       });
   };
 
-  const periodicUpdate = () => delay(5000)
-    .then(() => updatePosts(watchedState.rssForm.addedUrls).then(() => periodicUpdate()));
-
   const form = document.querySelector('form');
   form.addEventListener('submit', (e) => {
     e.preventDefault();
+    watchedState.rssForm.processState = processStates.submitting;
     const formData = new FormData(e.target);
     const url = formData.get('url');
-    watchedState.rssForm.fields.url = url;
-    watchedState.rssForm.processState = 'sent';
-    const validationError = updateValidationState(watchedState);
-    if (validationError !== '') {
+    watchedState.rssForm.url = url;
+    watchedState.rssForm.validationError = validate(watchedState);
+    if (watchedState.rssForm.validationError === '') {
+      watchedState.rssForm.valid = true;
+    } else {
+      watchedState.rssForm.valid = false;
       return;
     }
 
-    makeRequest(url)
-      .then((document) => parse(document))
+    axios.get(getUrlWithProxy(url))
+      .then((response) => parse(response))
       .then((data) => {
-        const [feed, ...posts] = setId(data);
-        watchedState.rssData.data.feeds.push(feed);
-        watchedState.rssData.data.posts.push({ feedId: feed.id, posts });
+        const { feed, posts } = data;
+        feed.id = _.uniqueId();
+        watchedState.rssData.feeds.push(feed);
+        watchedState.rssData.posts.push({ feedId: feed.id, posts: setId(posts) });
         watchedState.rssForm.addedUrls.push({ id: feed.id, url });
-        watchedState.rssForm.processState = 'initial';
+        watchedState.rssData.error = '';
+        watchedState.rssForm.processState = processStates.initial;
       })
-      .then(periodicUpdate)
+      .then(() => setTimeout(function update() {
+        updatePosts(watchedState.rssForm.addedUrls).then(() => setTimeout(update, 5000));
+      }, 5000))
       .catch((err) => {
-        console.log(err);
         watchedState.rssData.error = err.message === i18next.t('parserError')
           ? i18next.t('parserError') : i18next.t('networkError');
       });
@@ -118,6 +133,6 @@ export default () => {
   $('#modal').on('show.bs.modal', (ev) => {
     const btn = ev.relatedTarget;
     const postId = btn.getAttribute('data-id');
-    watchedState.rssData.data.visitedPostsId.push(postId);
+    watchedState.rssData.visitedPostsIds.push(postId);
   });
 };
