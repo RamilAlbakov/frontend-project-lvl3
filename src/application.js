@@ -18,13 +18,13 @@ const validate = (state) => {
     schema.validateSync({ url }, { abortEarly: false });
     return processedUrls.includes(url) ? i18next.t('rssExistError') : '';
   } catch (err) {
-    return err.inner[0].message;
+    return i18next.t('invalidURL');
   }
 };
 
 export default () => {
   i18next.init({
-    lng: 'en',
+    lng: 'ru',
     debug: true,
     resources,
   }).then(() => {
@@ -54,6 +54,7 @@ export default () => {
     modalTitle: document.querySelector('.modal-title'),
     modalBody: document.querySelector('.modal-body'),
     btnFullArticle: document.querySelector('.full-article'),
+    btnClosePreview: document.querySelector('.close-preview'),
     feedsDiv: document.querySelector('.feeds'),
     postsDiv: document.querySelector('.posts'),
   };

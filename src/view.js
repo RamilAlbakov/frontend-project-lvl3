@@ -106,6 +106,7 @@ const renderModalDiv = (postId, posts, elements) => {
   elements.modalBody.textContent = description;
   elements.btnFullArticle.setAttribute('href', link);
   elements.btnFullArticle.textContent = i18next.t('modalBtnFullArticle');
+  elements.btnClosePreview.textContent = i18next.t('closePreview');
 };
 
 const renderVisitedLinks = (visitedPostsIds) => {
