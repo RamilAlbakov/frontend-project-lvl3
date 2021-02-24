@@ -48,53 +48,53 @@ export default () => {
     modalPostId: '',
   };
 
-  const elements = {
-    input: document.querySelector('[name=url]'),
-    feedbackDiv: document.querySelector('.feedback'),
-    addBtn: document.querySelector('[type="submit"]'),
-    modalTitle: document.querySelector('.modal-title'),
-    modalBody: document.querySelector('.modal-body'),
-    btnFullArticle: document.querySelector('.full-article'),
-    btnClosePreview: document.querySelector('.close-preview'),
-    feedsDiv: document.querySelector('.feeds'),
-    postsDiv: document.querySelector('.posts'),
-    form: document.querySelector('form'),
-  };
-
-  const watchedState = onchange(state, elements);
-
-  const updatePosts = (urls) => {
-    const newPostsPromises = urls.map((addedUrl) => {
-      const { id, url } = addedUrl;
-      return axios.get(getUrlWithProxy(url))
-        .then((response) => parse(response))
-        .then((rssData) => {
-          const { posts } = rssData;
-          return { feedId: id, posts };
-        });
-    });
-
-    return Promise.all(newPostsPromises)
-      .then((allNewPosts) => {
-        const allOldPosts = watchedState.rssData.posts;
-        watchedState.rssData.posts = allNewPosts
-          .map((newPosts) => {
-            const { feedId } = newPosts;
-            const [oldPosts] = allOldPosts.filter((item) => item.feedId === feedId);
-            const diff = _.differenceBy(newPosts.posts, oldPosts.posts, 'title');
-            const diffWithId = setId(diff);
-            const posts = _.concat(diffWithId, oldPosts.posts);
-            return { feedId, posts };
-          });
-      });
-  };
-
   i18next.init({
     lng: 'ru',
     debug: true,
     resources,
     fallbackLng: 'ru',
   }).then(() => {
+    const elements = {
+      input: document.querySelector('[name=url]'),
+      feedbackDiv: document.querySelector('.feedback'),
+      addBtn: document.querySelector('[type="submit"]'),
+      modalTitle: document.querySelector('.modal-title'),
+      modalBody: document.querySelector('.modal-body'),
+      btnFullArticle: document.querySelector('.full-article'),
+      btnClosePreview: document.querySelector('.close-preview'),
+      feedsDiv: document.querySelector('.feeds'),
+      postsDiv: document.querySelector('.posts'),
+      form: document.querySelector('form'),
+    };
+
+    const watchedState = onchange(state, elements);
+
+    const updatePosts = (urls) => {
+      const newPostsPromises = urls.map((addedUrl) => {
+        const { id, url } = addedUrl;
+        return axios.get(getUrlWithProxy(url))
+          .then((response) => parse(response))
+          .then((rssData) => {
+            const { posts } = rssData;
+            return { feedId: id, posts };
+          });
+      });
+
+      return Promise.all(newPostsPromises)
+        .then((allNewPosts) => {
+          const allOldPosts = watchedState.rssData.posts;
+          watchedState.rssData.posts = allNewPosts
+            .map((newPosts) => {
+              const { feedId } = newPosts;
+              const [oldPosts] = allOldPosts.filter((item) => item.feedId === feedId);
+              const diff = _.differenceBy(newPosts.posts, oldPosts.posts, 'title');
+              const diffWithId = setId(diff);
+              const posts = _.concat(diffWithId, oldPosts.posts);
+              return { feedId, posts };
+            });
+        });
+    };
+
     elements.form.addEventListener('submit', (e) => {
       e.preventDefault();
       watchedState.rssForm.processState = processStates.submitting;
