@@ -22,15 +22,15 @@ const validate = (state) => {
   }
 };
 
-export default () => {
-  i18next.init({
-    lng: 'ru',
-    debug: true,
-    resources,
-  }).then(() => {
-    console.log('initialized');
-  });
+const getUrlWithProxy = (url) => `https://api.allorigins.win/raw?url=${url}`;
+// const getUrlWithProxy = (url) => `https://thingproxy.freeboard.io/fetch/${url}`;
 
+const setId = (data) => data.map((item) => {
+  item.id = _.uniqueId();
+  return item;
+});
+
+export default () => {
   const state = {
     rssForm: {
       url: '',
@@ -45,6 +45,7 @@ export default () => {
       visitedPostsIds: [],
       error: null,
     },
+    modalPostId: '',
   };
 
   const elements = {
@@ -57,17 +58,10 @@ export default () => {
     btnClosePreview: document.querySelector('.close-preview'),
     feedsDiv: document.querySelector('.feeds'),
     postsDiv: document.querySelector('.posts'),
+    form: document.querySelector('form'),
   };
 
-  const getUrlWithProxy = (url) => `https://api.allorigins.win/raw?url=${url}`;
-  // const getUrlWithProxy = (url) => `https://thingproxy.freeboard.io/fetch/${url}`;
-
   const watchedState = onchange(state, elements);
-
-  const setId = (data) => data.map((item) => {
-    item.id = _.uniqueId();
-    return item;
-  });
 
   const updatePosts = (urls) => {
     const newPostsPromises = urls.map((addedUrl) => {
@@ -95,44 +89,55 @@ export default () => {
       });
   };
 
-  const form = document.querySelector('form');
-  form.addEventListener('submit', (e) => {
-    e.preventDefault();
-    watchedState.rssForm.processState = processStates.submitting;
-    const formData = new FormData(e.target);
-    const url = formData.get('url');
-    watchedState.rssForm.url = url;
-    watchedState.rssForm.validationError = validate(watchedState);
-    if (watchedState.rssForm.validationError === '') {
-      watchedState.rssForm.valid = true;
-    } else {
-      watchedState.rssForm.valid = false;
-      return;
-    }
+  i18next.init({
+    lng: 'ru',
+    debug: true,
+    resources,
+  }).then(() => {
+    elements.form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      watchedState.rssForm.processState = processStates.submitting;
+      const formData = new FormData(e.target);
+      const url = formData.get('url');
+      watchedState.rssForm.url = url;
+      watchedState.rssForm.validationError = validate(watchedState);
+      if (watchedState.rssForm.validationError === '') {
+        watchedState.rssForm.valid = true;
+      } else {
+        watchedState.rssForm.valid = false;
+        return;
+      }
 
-    axios.get(getUrlWithProxy(url))
-      .then((response) => parse(response))
-      .then((data) => {
-        const { feed, posts } = data;
-        feed.id = _.uniqueId();
-        watchedState.rssData.feeds.push(feed);
-        watchedState.rssData.posts.push({ feedId: feed.id, posts: setId(posts) });
-        watchedState.rssForm.addedUrls.push({ id: feed.id, url });
-        watchedState.rssData.error = '';
-        watchedState.rssForm.processState = processStates.initial;
-      })
-      .then(() => setTimeout(function update() {
-        updatePosts(watchedState.rssForm.addedUrls).then(() => setTimeout(update, 5000));
-      }, 5000))
-      .catch((err) => {
-        watchedState.rssData.error = err.message === i18next.t('parserError')
-          ? i18next.t('parserError') : i18next.t('networkError');
-      });
-  });
+      axios.get(getUrlWithProxy(url))
+        .then((response) => parse(response))
+        .then((data) => {
+          const { feed, posts } = data;
+          feed.id = _.uniqueId();
+          watchedState.rssData.feeds.push(feed);
+          watchedState.rssData.posts.push({ feedId: feed.id, posts: setId(posts) });
+          watchedState.rssForm.addedUrls.push({ id: feed.id, url });
+          watchedState.rssData.error = '';
+          watchedState.rssForm.processState = processStates.initial;
+        })
+        .then(() => setTimeout(function update() {
+          updatePosts(watchedState.rssForm.addedUrls).then(() => setTimeout(update, 5000));
+        }, 5000))
+        .catch((err) => {
+          watchedState.rssData.error = err.message === i18next.t('parserError')
+            ? i18next.t('parserError') : i18next.t('networkError');
+        });
+    });
 
-  $('#modal').on('show.bs.modal', (ev) => {
-    const btn = ev.relatedTarget;
-    const postId = btn.getAttribute('data-id');
-    watchedState.rssData.visitedPostsIds.push(postId);
+    $('#modal').on('show.bs.modal', (ev) => {
+      const btn = ev.relatedTarget;
+      const postId = btn.getAttribute('data-id');
+      watchedState.modalPostId = postId;
+    });
+
+    elements.postsDiv.addEventListener('click', (ev) => {
+      const link = ev.target;
+      const postId = link.getAttribute('data-id');
+      watchedState.rssData.visitedPostsIds.push(postId);
+    });
   });
 };

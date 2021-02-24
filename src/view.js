@@ -68,7 +68,7 @@ const createPostsUl = (data) => {
       const { title, link, id } = post;
       return `
         <li class="list-group-item d-flex justify-content-between align-items-start">
-          <a href="${link}" class="font-weight-bold" target="_blank" rel="noopener noreferrer">${title}</a>
+          <a href="${link}" class="font-weight-bold" target="_blank" data-id="${id}" rel="noopener noreferrer">${title}</a>
           <button type="button" class="btn btn-primary btn-sm" data-id="${id}" data-toggle="modal" data-target="#modal">
             ${i18next.t('previewBtnText')}
           </button>
@@ -141,12 +141,12 @@ export const onchange = (state, elements) => onChange(state, (path, value) => {
     case 'rssForm.processState':
       formProcessStateHandler(value, elements);
       break;
-    case 'rssData.visitedPostsIds': {
-      const lastVisitedPostId = value[value.length - 1];
-      renderModalDiv(lastVisitedPostId, state.rssData.posts, elements);
+    case 'rssData.visitedPostsIds':
       renderVisitedLinks(value);
       break;
-    }
+    case 'modalPostId':
+      renderModalDiv(value, state.rssData.posts, elements);
+      break;
     default:
       break;
   }
