@@ -93,6 +93,7 @@ export default () => {
     lng: 'ru',
     debug: true,
     resources,
+    fallbackLng: 'ru',
   }).then(() => {
     elements.form.addEventListener('submit', (e) => {
       e.preventDefault();
