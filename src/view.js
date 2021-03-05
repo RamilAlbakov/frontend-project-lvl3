@@ -1,4 +1,3 @@
-import i18next from 'i18next';
 import onChange from 'on-change';
 
 export const processStates = {
@@ -18,12 +17,12 @@ const validationErrorHandler = (error, elements) => {
   elements.addBtn.disabled = false;
 };
 
-const formProcessStateHandler = (state, elements) => {
+const formProcessStateHandler = (state, elements, i18Instance) => {
   if (state === processStates.initial) {
     elements.input.value = null;
     elements.feedbackDiv.classList.remove('text-danger');
     elements.feedbackDiv.classList.add('text-success');
-    elements.feedbackDiv.textContent = i18next.t('feedSuccess');
+    elements.feedbackDiv.textContent = i18Instance.t('feedSuccess');
     elements.input.focus();
     elements.addBtn.disabled = false;
   }
@@ -58,7 +57,7 @@ const createFeedUl = (feeds) => {
   return `<ul class="list-group mb-5">${liHtml}</ul>`;
 };
 
-const createPostsUl = (data) => {
+const createPostsUl = (data, i18Instance) => {
   const allPosts = [...data]
     .reverse()
     .flatMap((item) => item.posts);
@@ -70,7 +69,7 @@ const createPostsUl = (data) => {
         <li class="list-group-item d-flex justify-content-between align-items-start">
           <a href="${link}" class="font-weight-bold" target="_blank" data-id="${id}" rel="noopener noreferrer">${title}</a>
           <button type="button" class="btn btn-primary btn-sm" data-id="${id}" data-toggle="modal" data-target="#modal">
-            ${i18next.t('previewBtnText')}
+            ${i18Instance.t('previewBtnText')}
           </button>
         </li>`.trim();
     })
@@ -79,25 +78,25 @@ const createPostsUl = (data) => {
   return `<ul class="list-group">${liHtml}</ul>`;
 };
 
-const renderFeedsAndPosts = (data, dataType, elements) => {
+const renderFeedsAndPosts = (data, dataType, elements, i18Instance) => {
   let div;
   let h2TextContent;
   let ul;
 
   if (dataType === 'feeds') {
     div = elements.feedsDiv;
-    h2TextContent = i18next.t('feeds');
+    h2TextContent = i18Instance.t('feeds');
     ul = createFeedUl(data);
   } else if (dataType === 'posts') {
     div = elements.postsDiv;
-    h2TextContent = i18next.t('posts');
-    ul = createPostsUl(data);
+    h2TextContent = i18Instance.t('posts');
+    ul = createPostsUl(data, i18Instance);
   }
 
   div.innerHTML = `<h2>${h2TextContent}</h2>${ul}`;
 };
 
-const renderModalDiv = (postId, posts, elements) => {
+const renderModalDiv = (postId, posts, elements, i18Instance) => {
   const [post] = posts
     .flatMap((item) => item.posts)
     .filter((p) => p.id === postId);
@@ -105,8 +104,8 @@ const renderModalDiv = (postId, posts, elements) => {
   elements.modalTitle.textContent = title;
   elements.modalBody.textContent = description;
   elements.btnFullArticle.setAttribute('href', link);
-  elements.btnFullArticle.textContent = i18next.t('modalBtnFullArticle');
-  elements.btnClosePreview.textContent = i18next.t('closePreview');
+  elements.btnFullArticle.textContent = i18Instance.t('modalBtnFullArticle');
+  elements.btnClosePreview.textContent = i18Instance.t('closePreview');
 };
 
 const renderVisitedLinks = (visitedPostsIds) => {
@@ -123,7 +122,7 @@ const renderVisitedLinks = (visitedPostsIds) => {
   });
 };
 
-export const onchange = (state, elements) => onChange(state, (path, value) => {
+export const onchange = (state, elements, i18Instance) => onChange(state, (path, value) => {
   switch (path) {
     case 'rssForm.validationError':
       validationErrorHandler(value, elements);
@@ -132,20 +131,20 @@ export const onchange = (state, elements) => onChange(state, (path, value) => {
       rssErrorHandler(value, elements);
       break;
     case 'rssData.feeds':
-      renderFeedsAndPosts(value, 'feeds', elements);
+      renderFeedsAndPosts(value, 'feeds', elements, i18Instance);
       break;
     case 'rssData.posts':
-      renderFeedsAndPosts(value, 'posts', elements);
+      renderFeedsAndPosts(value, 'posts', elements, i18Instance);
       renderVisitedLinks(state.rssData.visitedPostsIds);
       break;
     case 'rssForm.processState':
-      formProcessStateHandler(value, elements);
+      formProcessStateHandler(value, elements, i18Instance);
       break;
     case 'rssData.visitedPostsIds':
       renderVisitedLinks(value);
       break;
     case 'modalPostId':
-      renderModalDiv(value, state.rssData.posts, elements);
+      renderModalDiv(value, state.rssData.posts, elements, i18Instance);
       break;
     default:
       break;

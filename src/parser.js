@@ -1,11 +1,9 @@
-import i18next from 'i18next';
-
-const parse = (response) => {
+const parse = (response, i18Instance) => {
   const httpParser = new DOMParser();
   const data = httpParser.parseFromString(response.data, 'application/xml');
   const parserError = data.getElementsByTagName('parsererror');
   if (parserError.length > 0) {
-    throw new Error(i18next.t('parserError'));
+    throw new Error(i18Instance.t('parserError'));
   }
 
   const titles = data.getElementsByTagName('title');
